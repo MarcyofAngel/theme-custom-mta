@@ -3,36 +3,23 @@ ID: theme-custom-mta
 description: A simple CAP project.
 version: 1.0.0
 modules:
-- name: theme-custom-mta-srv
-  type: nodejs
-  path: gen/srv
-  requires:
-  - name: theme-custom-mta-db
-  - name: theme-custom-mta-uaa
-  provides:
-  - name: srv-api
-    properties:
-      srv-url: ${default-url}
-- name: theme-custom-mta-db-deployer
-  type: hdb
-  path: gen/db
-  requires:
-  - name: theme-custom-mta-db
-  parameters:
-    buildpack: nodejs_buildpack
 - name: theme-custom-mta-approuter
   type: approuter.nodejs
   path: theme-custom-mta-approuter
   requires:
   - name: theme-custom-mta_html_repo_runtime
   - name: theme-custom-mta-uaa
+  - name: theme-custom-theming
   - name: portal_resources_theme-custom-mta
-  parameters:
-    disk-quota: 256M
-    memory: 256M
+  - name: srv_api
+    group: destinations
+    properties:
+      forwardAuthToken: true
+      name: srv_api
+      url: '~{srv-url}'
 - name: theme-custom-mta_ui_deployer
   type: com.sap.application.content
-  path: app
+  path: theme-custom-mta_ui_deployer
   requires:
   - name: theme-custom-mta_html_repo_host
     parameters:
@@ -44,9 +31,29 @@ modules:
       - app-theme-content.zip
       name: app-theme
       target-path: resources/
+- name: theme-custom-mta-db
+  type: hdb
+  path: db
+  requires:
+  - name: theme-custom-mta-db-hdi-container
+  parameters:
+    disk-quota: 256M
+    memory: 256M
+- name: theme-custom-mta-srv
+  type: nodejs
+  path: srv
+  requires:
+  - name: theme-custom-mta-db-hdi-container
+  - name: theme-custom-mta-uaa
+  provides:
+  - name: srv_api
+    properties:
+      srv-url: ${default-url}
 - name: app-theme
   type: html5
   path: app-theme
+  requires:
+    - name: theme-custom-theming
   build-parameters:
     builder: custom
     commands:
@@ -60,12 +67,13 @@ modules:
   - name: theme-custom-mta_html_repo_host
   - name: theme-custom-mta_ui_deployer
   - name: theme-custom-mta-uaa
+  - name: theme-custom-theming
   parameters:
     buildpack: https://github.com/cloudfoundry/nodejs-buildpack/releases/download/v1.6.51/nodejs-buildpack-cflinuxfs3-v1.6.51.zip
     memory: 128M
     stack: cflinuxfs3
 resources:
-- name: theme-custom-mta-db
+- name: theme-custom-mta-db-hdi-container
   type: com.sap.xs.hdi-container
   parameters:
     service: hana
@@ -96,6 +104,11 @@ resources:
   type: org.cloudfoundry.managed-service
   parameters:
     service: portal
+    service-plan: standard
+- name: theme-custom-theming
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: theming
     service-plan: standard
 parameters:
   enable-parallel-deployments: true
