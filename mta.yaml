@@ -1,0 +1,107 @@
+_schema-version: "3.1"
+ID: theme-custom-mta
+description: A simple CAP project.
+version: 1.0.0
+modules:
+- name: theme-custom-mta-srv
+  type: nodejs
+  path: gen/srv
+  requires:
+  - name: theme-custom-mta-db
+  - name: theme-custom-mta-uaa
+  provides:
+  - name: srv-api
+    properties:
+      srv-url: ${default-url}
+- name: theme-custom-mta-db-deployer
+  type: hdb
+  path: gen/db
+  requires:
+  - name: theme-custom-mta-db
+  parameters:
+    buildpack: nodejs_buildpack
+- name: theme-custom-mta-approuter
+  type: approuter.nodejs
+  path: theme-custom-mta-approuter
+  requires:
+  - name: theme-custom-mta_html_repo_runtime
+  - name: theme-custom-mta-uaa
+  - name: portal_resources_theme-custom-mta
+  parameters:
+    disk-quota: 256M
+    memory: 256M
+- name: theme-custom-mta_ui_deployer
+  type: com.sap.application.content
+  path: app
+  requires:
+  - name: theme-custom-mta_html_repo_host
+    parameters:
+      content-target: true
+  build-parameters:
+    build-result: resources
+    requires:
+    - artifacts:
+      - app-theme-content.zip
+      name: app-theme
+      target-path: resources/
+- name: app-theme
+  type: html5
+  path: app-theme
+  build-parameters:
+    builder: custom
+    commands:
+    - npm run build
+    supported-platforms: []
+- name: theme-custom-launchpad
+  type: com.sap.portal.content
+  path: theme-custom-launchpad
+  requires:
+  - name: portal_resources_theme-custom-mta
+  - name: theme-custom-mta_html_repo_host
+  - name: theme-custom-mta_ui_deployer
+  - name: theme-custom-mta-uaa
+  parameters:
+    buildpack: https://github.com/cloudfoundry/nodejs-buildpack/releases/download/v1.6.51/nodejs-buildpack-cflinuxfs3-v1.6.51.zip
+    memory: 128M
+    stack: cflinuxfs3
+resources:
+- name: theme-custom-mta-db
+  type: com.sap.xs.hdi-container
+  parameters:
+    service: hana
+    service-plan: hdi-shared
+  properties:
+    hdi-service-name: ${service-name}
+- name: theme-custom-mta-uaa
+  type: org.cloudfoundry.managed-service
+  parameters:
+    path: ./xs-security.json
+    service: xsuaa
+    service-name: theme-custom-mta-xsuaa-service
+    service-plan: application
+    config:
+        xsappname: 'theme-custom-mta-uaa-${space}'
+        tenant-mode: dedicated
+- name: theme-custom-mta_html_repo_runtime
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: html5-apps-repo
+    service-plan: app-runtime
+- name: theme-custom-mta_html_repo_host
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: html5-apps-repo
+    service-plan: app-host
+- name: portal_resources_theme-custom-mta
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: portal
+    service-plan: standard
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+  - builder: custom
+    commands:
+    - npm install --production
+    - npx -p @sap/cds-dk cds build --production
